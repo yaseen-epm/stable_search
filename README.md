@@ -5,37 +5,36 @@ Express + TypeScript service for converting a free-text e-commerce search query 
 ## Architecture (block diagram)
 
 ```mermaid
-%%{init: {"flowchart": {"curve": "basis"}, "theme": "base", "themeVariables": {"fontFamily": "ui-sans-serif, system-ui", "primaryColor": "#E0F2FE", "primaryTextColor": "#0B1220", "lineColor": "#475569", "tertiaryColor": "#FFF7ED"}} }%%
 flowchart LR
-  subgraph Client[Client]
+  subgraph Client["Client"]
     U["User / Frontend"]
   end
 
-  subgraph API[Express API]
-    R["POST /search\n(src/index.ts)"]
-    C["Controller\n(search3.controller.ts)"]
-    S["SearchService3\n(search3.service.ts)"]
+  subgraph API["Express API"]
+    R["POST /search3<br/>(src/index.ts)"]
+    C["Controller<br/>(search3.controller.ts)"]
+    S["SearchService3<br/>(search3.service.ts)"]
   end
 
-  subgraph Cache[Cache (Tiered)]
-    M["In-memory Map\n(L1)"]
-    D["Redis\n(L2 - optional)"]
+  subgraph Cache["Cache (Tiered)"]
+    M["In-memory Map<br/>(L1)"]
+    D["Redis<br/>(L2 - optional)"]
   end
 
-  subgraph Retrieval[Facet Retrieval]
-    E["Embeddings\n(Azure OpenAI)"]
-    Q["Qdrant Vector Search\n(facet_groups)"]
+  subgraph Retrieval["Facet Retrieval"]
+    E["Embeddings<br/>(Azure OpenAI)"]
+    Q["Qdrant Vector Search<br/>(facet_groups)"]
     F["Candidate facets + values"]
   end
 
-  subgraph LLM[LLM Mapping]
-    L["Azure OpenAI Chat\n(temperature=0)"]
-    Z["Sanitize + Allowlist\n(known facet ids/values)"]
+  subgraph LLM["LLM Mapping"]
+    L["Azure OpenAI Chat<br/>(temperature=0)"]
+    Z["Sanitize + Allowlist<br/>(known facet ids/values)"]
   end
 
-  subgraph Output[Response]
-    O1["structured\n{ query, mapping }"]
-    O2["ajaxQuery\n?q=...&x1=...&q1=..."]
+  subgraph Output["Response"]
+    O1["structured<br/>{ query, mapping }"]
+    O2["ajaxQuery<br/>?q=...&x1=...&q1=..."]
   end
 
   U --> R --> C --> S
@@ -61,13 +60,6 @@ flowchart LR
   class E,Q,F retrieval;
   class L,Z llm;
   class O1,O2 out;
-
-  %% Interactive links (supported by many Mermaid renderers)
-  click R "src/index.ts" "Open server entrypoint"
-  click C "src/controllers/search3.controller.ts" "Open controller"
-  click S "src/services/search3.service.ts" "Open search pipeline"
-  click Q "https://qdrant.tech/" "Qdrant docs"
-  click L "https://learn.microsoft.com/azure/ai-services/openai/" "Azure OpenAI docs"
 ```
 
 It uses:
