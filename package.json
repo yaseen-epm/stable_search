@@ -1,0 +1,31 @@
+{
+  "name": "hackathon",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --watch src --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist node_modules package-lock.json",
+    "reinstall": "npm run clean && npm install"
+  },
+  "dependencies": {
+    "@azure/openai": "^2.0.0",
+    "@langchain/community": "^1.1.24",
+    "@langchain/core": "^1.1.35",
+    "@qdrant/js-client-rest": "^1.17.0",
+    "axios": "^1.13.6",
+    "express": "^5.2.1",
+    "langchain": "^1.2.37",
+    "redis": "^4.7.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "nodemon": "^3.1.14"
+  }
+}
