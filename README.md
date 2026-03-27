@@ -11,7 +11,7 @@ flowchart LR
   end
 
   subgraph API["Express API"]
-    R["POST /search3<br/>(src/index.ts)"]
+    R["POST /search<br/>(src/index.ts)"]
     C["Controller<br/>(search3.controller.ts)"]
     S["SearchService3<br/>(search3.service.ts)"]
   end
