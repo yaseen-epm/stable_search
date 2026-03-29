@@ -3,7 +3,9 @@
 Express + TypeScript service for converting a free-text e-commerce search query into a **structured facet mapping** and a **compatible AJAX query string**.
 
 The package can now be used in two modes:
+ 
 
+ 
 - Library mode: install `llm-search-lib` and call `search(query)` directly.
 - Server mode: run the Express endpoint (`POST /search`) as before.
 
