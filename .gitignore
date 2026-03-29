@@ -1,0 +1,31 @@
+# pattern files
+*.*~
+*/target
+*.iml
+*.log
+*.tgz
+
+# files
+.npm
+.env
+.vscode
+.DS_Store
+.npmrc
+
+# folders
+node_modules/
+.idea/
+.nyc_output/
+nyc-reports/
+/dist/*
+coverage/
+.vs/
+*.orig
+.history
+.scannerwork/
+/dist/
+/dist/*
+/dist*
+/node_modules/
+/node_modules/*
+/node_modules*

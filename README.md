@@ -2,6 +2,11 @@
 
 Express + TypeScript service for converting a free-text e-commerce search query into a **structured facet mapping** and a **compatible AJAX query string**.
 
+The package can now be used in two modes:
+
+- Library mode: install `llm-search-lib` and call `search(query)` directly.
+- Server mode: run the Express endpoint (`POST /search`) as before.
+
 ## Architecture (block diagram)
 
 ```mermaid
@@ -131,6 +136,45 @@ curl -s \
 
 ---
 
+## Library usage (npm)
+
+Install in another service:
+
+```bash
+npm install llm-search-lib
+```
+
+Use the convenience function:
+
+```ts
+import { search } from "llm-search-lib";
+
+const result = await search("cheap nike running shoes");
+console.log(result.structured);
+console.log(result.ajaxQuery);
+```
+
+Or use the class API:
+
+```ts
+import { SearchService3, validateAndNormalizeQuery } from "llm-search-lib";
+
+const service = new SearchService3();
+const query = validateAndNormalizeQuery("cheap nike running shoes");
+const result = await service.search(query);
+```
+
+Optional server import from package subpath:
+
+```ts
+import { createApp } from "llm-search-lib/server";
+
+const app = createApp();
+app.listen(3000);
+```
+
+---
+
 ## Quick start
 
 ### 1) Install
@@ -214,7 +258,7 @@ Defined in `src/config/env.ts`.
 ### High-level components
 
 - **Express API** (`src/index.ts`)
-  - Single endpoint: `POST /search3`
+  - Single endpoint: `POST /search`
   - Adds `requestLogger` middleware to print request/response timing
 
 - **Controller** (`src/controllers/search3.controller.ts`)
@@ -255,7 +299,7 @@ Defined in `src/config/env.ts`.
 
 ## Data flow (request-time)
 
-1. Client calls `POST /search3` with `{ query }`.
+1. Client calls `POST /search` with `{ query }`.
 2. `SearchService3` checks tiered cache.
 3. If not cached:
    1. The query is decomposed into a small set of related subqueries (base query + simple intent probes).

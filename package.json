@@ -1,18 +1,36 @@
 {
-  "name": "hackathon",
+  "name": "llm-search-lib",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
   "author": "",
   "type": "commonjs",
-  "main": "index.js",
+  "main": "dist/lib.js",
+  "types": "dist/lib.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "require": "./dist/lib.js",
+      "default": "./dist/lib.js"
+    },
+    "./server": {
+      "types": "./dist/app.d.ts",
+      "require": "./dist/app.js",
+      "default": "./dist/app.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --watch src --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf dist node_modules package-lock.json",
-    "reinstall": "npm run clean && npm install"
+    "reinstall": "npm run clean && npm install",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@azure/openai": "^2.0.0",
