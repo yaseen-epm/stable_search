@@ -165,7 +165,7 @@ export class SearchService3 {
   }
 
   private buildAjax(data: any) {
-    let url = `?q=${encodeURIComponent(data.query)}`;
+    let url = `q=${encodeURIComponent(data.query)}`;
 
     if (data.mapping) {
       Object.entries(data.mapping).forEach(([k, v]: any, i) => {
