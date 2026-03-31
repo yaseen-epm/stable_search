@@ -7,6 +7,18 @@ export class FacetVectorService {
   private client = new QdrantClient({ url: ENV.QDRANT_URL });
   private embeddingService = new EmbeddingService();
 
+  private extractQ1(url: unknown): string | null {
+    if (typeof url !== "string" || url.trim().length === 0) return null;
+
+    try {
+      const u = new URL(url, "http://local");
+      const q1 = u.searchParams.get("q1");
+      return (typeof q1 === "string" && q1.trim().length > 0) ? q1.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getRelevantFacets(query: string) {
     try {
       const vector = await withTimeout(this.embeddingService.embed(query), 2500);
@@ -41,14 +53,22 @@ export class FacetVectorService {
       if (!p?.id || !Array.isArray(p.values)) continue;
 
       const facetId = p.id;
+      const facetType = p.type;
+      const isRangeFacet = facetType === "range" || facetId === "pricerange";
 
       if (!grouped[facetId]) grouped[facetId] = [];
 
       // 🔥 extract values from facet group
       for (const v of p.values) {
-        if (!v?.label) continue;
+        const fromUrl = isRangeFacet ? this.extractQ1(v?.url) : null;
+        const fromLabel = (typeof v?.label === "string" && v.label.trim().length > 0)
+          ? v.label.trim()
+          : null;
 
-        grouped[facetId].push(v.label);
+        const chosen = fromUrl || fromLabel;
+        if (!chosen) continue;
+
+        grouped[facetId].push(chosen);
       }
     }
 
