@@ -20,10 +20,12 @@ export class FacetVectorService {
   }
 
   async getRelevantFacets(query: string) {
+    const tAll = Date.now();
     try {
       const vector = await withTimeout(this.embeddingService.embed(query), 2500);
       if (!vector.length) return {};
 
+      const tQ = Date.now();
       const result = await withTimeout(
         this.client.search(ENV.QDRANT_COLLECTION, {
           vector,
@@ -33,8 +35,16 @@ export class FacetVectorService {
         2000
       );
 
+      const qMs = Date.now() - tQ;
+      const totalMs = Date.now() - tAll;
+      console.log(
+        `[perf] qdrant search ms=${qMs} total_ms=${totalMs} query_len=${query.length} collection=${ENV.QDRANT_COLLECTION}`
+      );
+
       return this.groupFacets(Array.isArray(result) ? result : []);
     } catch (err: any) {
+      const totalMs = Date.now() - tAll;
+      console.log(`[perf] qdrant failed total_ms=${totalMs} query_len=${query.length}`);
       if (err?.status === 404) {
         console.warn("Qdrant collection not found");
         return {};
