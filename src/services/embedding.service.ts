@@ -16,9 +16,13 @@ const EMBEDDING_DEPLOYMENT = ENV.AZURE_EMBEDDING_DEPLOYMENT;
 export async function getEmbedding(text: string): Promise<number[]> {
   const key = text.toLowerCase().trim();
 
-  if (cache.has(key)) return cache.get(key)!;
+  if (cache.has(key)) {
+    console.log(`[perf] embedding cache_hit key_len=${key.length}`);
+    return cache.get(key)!;
+  }
 
   try {
+    const t0 = Date.now();
     const res = await withTimeout(
       client.embeddings.create({
         model: EMBEDDING_DEPLOYMENT,
@@ -26,6 +30,9 @@ export async function getEmbedding(text: string): Promise<number[]> {
       }),
       2500
     );
+
+    const ms = Date.now() - t0;
+    console.log(`[perf] embedding remote ms=${ms} input_len=${key.length}`);
 
     const embedding = res.data[0].embedding;
 
@@ -51,6 +58,7 @@ export class EmbeddingService {
 
   async embed(text: string): Promise<number[]> {
     try {
+      const t0 = Date.now();
       const res = await withTimeout(
         this.client.embeddings.create({
           model: ENV.AZURE_EMBEDDING_DEPLOYMENT,
@@ -58,6 +66,9 @@ export class EmbeddingService {
         }),
         2500
       );
+
+      const ms = Date.now() - t0;
+      console.log(`[perf] embedding ms=${ms} input_len=${String(text).length}`);
       return res.data[0].embedding;
     } catch (err: any) {
       console.error("Embedding error:", err?.message);

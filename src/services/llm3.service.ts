@@ -10,6 +10,7 @@ export class LLMService {
   });
 
   async generate(userQuery: string, facets: any) {
+    const t0 = Date.now();
     const prompt = `
 You are a STRICT e-commerce query parser.
 
@@ -46,6 +47,8 @@ Return JSON:
       );
 
       const raw = res.choices?.[0]?.message?.content || "";
+      const ms = Date.now() - t0;
+      console.log(`[perf] llm ms=${ms} query_len=${userQuery.length} facets=${Object.keys(facets || {}).length} raw_len=${raw.length}`);
 
       try {
         return JSON.parse(raw);
@@ -61,6 +64,8 @@ Return JSON:
         return { query: userQuery, filters: {}, mapping: {} };
       }
     } catch (err: any) {
+      const ms = Date.now() - t0;
+      console.log(`[perf] llm failed ms=${ms} query_len=${userQuery.length}`);
       console.error("LLM generate error:", err?.message || err);
       return { query: userQuery, filters: {}, mapping: {} };
     }

@@ -9,21 +9,28 @@ export class SearchService3 {
   private llmService = new LLMService();
 
   async search(query: string) {
+    const tAll = Date.now();
     const normalizedQuery = query.trim();
     const cacheKey = `search3:v1:${normalizedQuery.toLowerCase()}`;
 
     try {
+      const tCache = Date.now();
       const cached = await cache.get<any>(cacheKey);
+      const cacheMs = Date.now() - tCache;
       if (cached) return cached;
+      console.log(`[perf] cache miss ms=${cacheMs} key_len=${cacheKey.length}`);
     } catch {
       // best-effort cache
     }
 
     const queries = this.decompose(query).slice(0, 5);
 
+    const tFacets = Date.now();
     const facetResults = await Promise.all(
       queries.map(q => this.facetService.getRelevantFacets(q))
     );
+    const facetsMs = Date.now() - tFacets;
+    console.log(`[perf] facets ms=${facetsMs} subqueries=${queries.length}`);
 
     let mergedFacets: FacetMap = {};
     facetResults.forEach((facets: Record<string, string[]>, idx: number) => {
@@ -49,7 +56,10 @@ export class SearchService3 {
       return response;
     }
 
+    const tLlm = Date.now();
     const structuredRaw = await this.llmService.generate(normalizedQuery, finalFacets);
+    const llmMs = Date.now() - tLlm;
+    console.log(`[perf] llm_total ms=${llmMs}`);
     const structured = this.sanitizeStructured(structuredRaw, finalFacets, normalizedQuery);
 
     const response = {
@@ -63,6 +73,8 @@ export class SearchService3 {
       // best-effort cache
     }
 
+    const totalMs = Date.now() - tAll;
+    console.log(`[perf] response total_ms=${totalMs} facets=${Object.keys(finalFacets).length}`);
     return response;
   }
 
@@ -165,7 +177,7 @@ export class SearchService3 {
   }
 
   private buildAjax(data: any) {
-    let url = `q=${encodeURIComponent(data.query)}`;
+    let url = `?q=${encodeURIComponent(data.query)}`;
 
     if (data.mapping) {
       Object.entries(data.mapping).forEach(([k, v]: any, i) => {
