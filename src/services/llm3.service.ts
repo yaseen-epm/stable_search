@@ -9,7 +9,7 @@ export class LLMService {
     apiVersion: "2024-02-15-preview"
   });
 
-  async generate(userQuery: string, facets: any) {
+  async generate(userQuery: string, facets: any, providedFilters?: any) {
     const t0 = Date.now();
     const prompt = `
 You are a STRICT e-commerce query parser.
@@ -20,9 +20,14 @@ RULES:
 - If unsure → return closed match mapping
 - ALWAYS return SAME output for SAME input
 - Prefer HIGH relevance facets only
+- If user query conflicts with provided filters, user query wins
+- Provided filters are optional hints / preselected filters
 
 User Query:
 "${userQuery}"
+
+Provided Filters (optional):
+${JSON.stringify(providedFilters || {})}
 
 Facets:
 ${JSON.stringify(facets)}
