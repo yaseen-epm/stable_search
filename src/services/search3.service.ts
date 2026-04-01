@@ -20,7 +20,9 @@ export class SearchService3 {
       const cached = await cache.get<any>(cacheKey);
       const cacheMs = Date.now() - tCache;
       if (cached) return cached;
-      console.log(`[perf] cache miss ms=${cacheMs} key_len=${cacheKey.length}`);
+      console.log(
+        `[perf] op=search cache=miss status=ok ms=${cacheMs} key_len=${cacheKey.length} query_len=${normalizedQuery.length} filters=${Object.keys(parsedFilters).length}`
+      );
     } catch {
       // best-effort cache
     }
@@ -32,7 +34,9 @@ export class SearchService3 {
       queries.map(q => this.facetService.getRelevantFacets(q))
     );
     const facetsMs = Date.now() - tFacets;
-    console.log(`[perf] facets ms=${facetsMs} subqueries=${queries.length}`);
+    console.log(
+      `[perf] op=facet_candidates source=qdrant status=ok ms=${facetsMs} subqueries=${queries.length} query_len=${normalizedQuery.length}`
+    );
 
     let mergedFacets: FacetMap = {};
     facetResults.forEach((facets: Record<string, string[]>, idx: number) => {
@@ -64,7 +68,9 @@ export class SearchService3 {
     const tLlm = Date.now();
     const structuredRaw = await this.llmService.generate(normalizedQuery, finalFacets, parsedFilters);
     const llmMs = Date.now() - tLlm;
-    console.log(`[perf] llm_total ms=${llmMs}`);
+    console.log(
+      `[perf] op=llm_total status=ok ms=${llmMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+    );
     const structuredBase = this.sanitizeStructured(structuredRaw, finalFacets, normalizedQuery);
     const structured = {
       query: structuredBase.query,
@@ -83,7 +89,9 @@ export class SearchService3 {
     }
 
     const totalMs = Date.now() - tAll;
-    console.log(`[perf] response total_ms=${totalMs} facets=${Object.keys(finalFacets).length}`);
+    console.log(
+      `[perf] op=search_response status=ok total_ms=${totalMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+    );
     return response;
   }
 

@@ -9,6 +9,8 @@ export class LLMService {
     apiVersion: "2024-02-15-preview"
   });
 
+  private static readonly TIMEOUT_MS = 6000;
+
   async generate(userQuery: string, facets: any, providedFilters?: any) {
     const t0 = Date.now();
     const prompt = `
@@ -48,12 +50,14 @@ Return JSON:
           messages: [{ role: "user", content: prompt }],
           temperature: 0
         }),
-        6000
+        LLMService.TIMEOUT_MS
       );
 
       const raw = res.choices?.[0]?.message?.content || "";
       const ms = Date.now() - t0;
-      console.log(`[perf] llm ms=${ms} query_len=${userQuery.length} facets=${Object.keys(facets || {}).length} raw_len=${raw.length}`);
+      console.log(
+        `[perf] op=llm_generate status=ok model=${ENV.AZURE_DEPLOYMENT} ms=${ms} timeout_ms=${LLMService.TIMEOUT_MS} query_len=${userQuery.length} facets=${Object.keys(facets || {}).length} provided_filters=${Object.keys(providedFilters || {}).length} raw_len=${raw.length}`
+      );
 
       try {
         return JSON.parse(raw);
@@ -70,7 +74,10 @@ Return JSON:
       }
     } catch (err: any) {
       const ms = Date.now() - t0;
-      console.log(`[perf] llm failed ms=${ms} query_len=${userQuery.length}`);
+      const message = err?.message || String(err);
+      console.log(
+        `[perf] op=llm_generate status=error model=${ENV.AZURE_DEPLOYMENT} ms=${ms} timeout_ms=${LLMService.TIMEOUT_MS} query_len=${userQuery.length} facets=${Object.keys(facets || {}).length} provided_filters=${Object.keys(providedFilters || {}).length} error=${message}`
+      );
       console.error("LLM generate error:", err?.message || err);
       return { query: userQuery, filters: {}, mapping: {} };
     }
