@@ -13,9 +13,9 @@ export interface SearchResult {
 
 const defaultSearchService = new SearchService3();
 
-export async function llmSearchQuery(query: unknown): Promise<SearchResult> {
+export async function llmSearchQuery(query: string, filters?: Record<string, string[]>): Promise<SearchResult> {
   const normalizedQuery = validateAndNormalizeQuery(query);
-  return defaultSearchService.search(normalizedQuery);
+  return defaultSearchService.search(normalizedQuery, filters);
 }
 
 export { SearchService3, SearchValidationError, validateAndNormalizeQuery };

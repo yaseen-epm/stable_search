@@ -8,21 +8,34 @@ export class SearchService3 {
   private facetService = new FacetVectorService();
   private llmService = new LLMService();
 
-  async search(query: string) {
+  async search(query: string, providedFilters?: unknown) {
+    const tAll = Date.now();
     const normalizedQuery = query.trim();
-    const cacheKey = `search3:v1:${normalizedQuery.toLowerCase()}`;
+    const parsedFilters = this.parseFilters(providedFilters);
+    const filtersKey = this.filtersCacheKey(parsedFilters);
+    const cacheKey = `search3:v1:${normalizedQuery.toLowerCase()}:${filtersKey}`;
 
     try {
+      const tCache = Date.now();
       const cached = await cache.get<any>(cacheKey);
+      const cacheMs = Date.now() - tCache;
       if (cached) return cached;
+      console.log(
+        `[perf] op=search cache=miss status=ok ms=${cacheMs} key_len=${cacheKey.length} query_len=${normalizedQuery.length} filters=${Object.keys(parsedFilters).length}`
+      );
     } catch {
       // best-effort cache
     }
 
     const queries = this.decompose(query).slice(0, 5);
 
+    const tFacets = Date.now();
     const facetResults = await Promise.all(
       queries.map(q => this.facetService.getRelevantFacets(q))
+    );
+    const facetsMs = Date.now() - tFacets;
+    console.log(
+      `[perf] op=facet_candidates source=qdrant status=ok ms=${facetsMs} subqueries=${queries.length} query_len=${normalizedQuery.length}`
     );
 
     let mergedFacets: FacetMap = {};
@@ -34,7 +47,10 @@ export class SearchService3 {
     const finalFacets = this.flattenFacets(mergedFacets);
 
     if (Object.keys(finalFacets).length === 0) {
-      const structured = { query: normalizedQuery, mapping: {} };
+      const structured = {
+        query: normalizedQuery,
+        mapping: this.mergeProvidedFilters({}, parsedFilters, {})
+      };
       const response = {
         structured,
         ajaxQuery: this.buildAjax(structured)
@@ -49,8 +65,17 @@ export class SearchService3 {
       return response;
     }
 
-    const structuredRaw = await this.llmService.generate(normalizedQuery, finalFacets);
-    const structured = this.sanitizeStructured(structuredRaw, finalFacets, normalizedQuery);
+    const tLlm = Date.now();
+    const structuredRaw = await this.llmService.generate(normalizedQuery, finalFacets, parsedFilters);
+    const llmMs = Date.now() - tLlm;
+    console.log(
+      `[perf] op=llm_total status=ok ms=${llmMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+    );
+    const structuredBase = this.sanitizeStructured(structuredRaw, finalFacets, normalizedQuery);
+    const structured = {
+      query: structuredBase.query,
+      mapping: this.mergeProvidedFilters(structuredBase.mapping, parsedFilters, finalFacets)
+    };
 
     const response = {
       structured,
@@ -63,7 +88,108 @@ export class SearchService3 {
       // best-effort cache
     }
 
+    const totalMs = Date.now() - tAll;
+    console.log(
+      `[perf] op=search_response status=ok total_ms=${totalMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+    );
     return response;
+  }
+
+  private filtersCacheKey(filters: Record<string, string[]>) {
+    const keys = Object.keys(filters).sort();
+    if (keys.length === 0) return "nofilters";
+
+    return keys
+      .map(k => `${k}=${(filters[k] || []).slice().sort().join("|")}`)
+      .join("&");
+  }
+
+  private normalizeFilterValue(raw: unknown): string | null {
+    if (typeof raw !== "string") return null;
+
+    let v = raw.trim();
+    if (v.length === 0) return null;
+
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1).trim();
+    }
+
+    try {
+      v = decodeURIComponent(v.replace(/\+/g, " "));
+    } catch {
+      v = v.replace(/\+/g, " ");
+    }
+
+    v = v.trim();
+    return v.length ? v : null;
+  }
+
+  private parseFilters(input: unknown): Record<string, string[]> {
+    if (!input || typeof input !== "object") return {};
+
+    const out: Record<string, string[]> = {};
+    for (const [facetIdRaw, rawVal] of Object.entries(input as Record<string, unknown>)) {
+      const facetId = String(facetIdRaw).trim();
+      if (!facetId) continue;
+
+      const values: string[] = [];
+
+      if (Array.isArray(rawVal)) {
+        for (const item of rawVal) {
+          const n = this.normalizeFilterValue(item);
+          if (n) values.push(n);
+        }
+      } else if (typeof rawVal === "string") {
+        rawVal.split("|").forEach(part => {
+          const n = this.normalizeFilterValue(part);
+          if (n) values.push(n);
+        });
+      } else {
+        const n = this.normalizeFilterValue(rawVal);
+        if (n) values.push(n);
+      }
+
+      const deduped = [...new Set(values)].slice(0, 25);
+      if (deduped.length) out[facetId] = deduped;
+      if (Object.keys(out).length >= 25) break;
+    }
+
+    return out;
+  }
+
+  private mergeProvidedFilters(
+    mapping: Record<string, string[]>,
+    provided: Record<string, string[]>,
+    allowedFacets: Record<string, string[]>
+  ) {
+    if (!provided || Object.keys(provided).length === 0) return mapping;
+
+    // Precedence rule: mapping (LLM/user query) wins when the same facetId exists.
+    const out: Record<string, string[]> = { ...mapping };
+
+    for (const [facetId, values] of Object.entries(provided)) {
+      if (out[facetId] && out[facetId].length > 0) continue;
+
+      const list = Array.isArray(values) ? values : [];
+      if (!list.length) continue;
+
+      const allowed = allowedFacets[facetId];
+
+      const cleaned = allowed
+        ? list
+            .map(v => String(v).trim())
+            .filter(v => v.length > 0)
+            .filter(v => new Set(allowed.map(a => String(a).toLowerCase())).has(v.toLowerCase()))
+            .slice(0, 20)
+        : list
+            .map(v => String(v).trim())
+            .filter(v => v.length > 0)
+            .slice(0, 20);
+
+      if (cleaned.length) out[facetId] = cleaned;
+    }
+
+    return out;
   }
 
   private sanitizeStructured(
@@ -165,7 +291,7 @@ export class SearchService3 {
   }
 
   private buildAjax(data: any) {
-    let url = `q=${encodeURIComponent(data.query)}`;
+    let url = `?q=${encodeURIComponent(data.query)}`;
 
     if (data.mapping) {
       Object.entries(data.mapping).forEach(([k, v]: any, i) => {

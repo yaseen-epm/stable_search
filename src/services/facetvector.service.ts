@@ -7,6 +7,9 @@ export class FacetVectorService {
   private client = new QdrantClient({ url: ENV.QDRANT_URL });
   private embeddingService = new EmbeddingService();
 
+  private static readonly EMBED_TIMEOUT_MS = 2500;
+  private static readonly QDRANT_TIMEOUT_MS = 2000;
+
   private extractQ1(url: unknown): string | null {
     if (typeof url !== "string" || url.trim().length === 0) return null;
 
@@ -20,21 +23,39 @@ export class FacetVectorService {
   }
 
   async getRelevantFacets(query: string) {
+    const tAll = Date.now();
     try {
-      const vector = await withTimeout(this.embeddingService.embed(query), 2500);
+      const tEmbed = Date.now();
+      const vector = await withTimeout(
+        this.embeddingService.embed(query),
+        FacetVectorService.EMBED_TIMEOUT_MS
+      );
+      const embedMs = Date.now() - tEmbed;
       if (!vector.length) return {};
 
+      const tQ = Date.now();
       const result = await withTimeout(
         this.client.search(ENV.QDRANT_COLLECTION, {
           vector,
           limit: 20,
           with_payload: true
         }),
-        2000
+        FacetVectorService.QDRANT_TIMEOUT_MS
+      );
+
+      const qMs = Date.now() - tQ;
+      const totalMs = Date.now() - tAll;
+      console.log(
+        `[perf] op=facetvector status=ok embed_ms=${embedMs} qdrant_ms=${qMs} total_ms=${totalMs} embed_timeout_ms=${FacetVectorService.EMBED_TIMEOUT_MS} qdrant_timeout_ms=${FacetVectorService.QDRANT_TIMEOUT_MS} query_len=${query.length} collection=${ENV.QDRANT_COLLECTION}`
       );
 
       return this.groupFacets(Array.isArray(result) ? result : []);
     } catch (err: any) {
+      const totalMs = Date.now() - tAll;
+      const message = err?.message || String(err);
+      console.log(
+        `[perf] op=facetvector status=error total_ms=${totalMs} embed_timeout_ms=${FacetVectorService.EMBED_TIMEOUT_MS} qdrant_timeout_ms=${FacetVectorService.QDRANT_TIMEOUT_MS} query_len=${query.length} collection=${ENV.QDRANT_COLLECTION} error=${message}`
+      );
       if (err?.status === 404) {
         console.warn("Qdrant collection not found");
         return {};
