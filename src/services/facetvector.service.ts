@@ -7,8 +7,8 @@ export class FacetVectorService {
   private client = new QdrantClient({ url: ENV.QDRANT_URL });
   private embeddingService = new EmbeddingService();
 
-  private static readonly EMBED_TIMEOUT_MS = 2500;
-  private static readonly QDRANT_TIMEOUT_MS = 2000;
+  private static readonly EMBED_TIMEOUT_MS = 25000;
+  private static readonly QDRANT_TIMEOUT_MS = 20000;
 
   private extractQ1(url: unknown): string | null {
     if (typeof url !== "string" || url.trim().length === 0) return null;
