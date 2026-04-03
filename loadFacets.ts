@@ -5,8 +5,6 @@ import axios from "axios";
 import { AzureOpenAI } from "openai";
 import { ENV } from "./src/config/env";
 
-
-
 /**
  * ============================
  * 🔧 CONFIG (EDIT HERE)
@@ -40,7 +38,7 @@ const FILE_PATH = path.join(__dirname, "./facets.json");
 const openai = new AzureOpenAI({
   apiKey: ENV.AZURE_OPENAI_KEY,
   endpoint: ENV.AZURE_OPENAI_ENDPOINT,
-  apiVersion: "2024-02-15-preview"
+  apiVersion: "2024-02-15-preview",
 });
 
 /**
@@ -59,7 +57,7 @@ async function getEmbedding(text: string): Promise<number[]> {
   try {
     const res = await openai.embeddings.create({
       model: EMBEDDING_DEPLOYMENT,
-      input: key
+      input: key,
     });
 
     const vector = res.data[0].embedding;
@@ -84,7 +82,7 @@ async function collectionExists(): Promise<boolean> {
   try {
     const res = await axios.get(`${QDRANT_URL}/collections`);
     return res.data.result.collections.some(
-      (c: any) => c.name === COLLECTION_NAME
+      (c: any) => c.name === COLLECTION_NAME,
     );
   } catch (err: any) {
     console.error("❌ Qdrant connection error:", err.message);
@@ -99,8 +97,8 @@ async function createCollection() {
   await axios.put(`${QDRANT_URL}/collections/${COLLECTION_NAME}`, {
     vectors: {
       size: 1536,
-      distance: "Cosine"
-    }
+      distance: "Cosine",
+    },
   });
 
   console.log("✅ Collection created");
@@ -114,8 +112,8 @@ async function getExistingIds(): Promise<Set<string>> {
       {
         limit: 1000,
         with_payload: false,
-        with_vector: false
-      }
+        with_vector: false,
+      },
     );
 
     return new Set(res.data.result.points.map((p: any) => p.id));
@@ -127,10 +125,9 @@ async function getExistingIds(): Promise<Set<string>> {
 
 // Insert points
 async function upsert(points: any[]) {
-  await axios.put(
-    `${QDRANT_URL}/collections/${COLLECTION_NAME}/points`,
-    { points }
-  );
+  await axios.put(`${QDRANT_URL}/collections/${COLLECTION_NAME}/points`, {
+    points,
+  });
 }
 
 /**
@@ -140,7 +137,16 @@ async function upsert(points: any[]) {
  */
 
 function generateId(facet: any): string {
-  return crypto.createHash("md5").update(facet.id).digest("hex");
+  const idSource =
+    typeof facet?.id === "string" && facet.id.trim().length > 0
+      ? facet.id.trim()
+      : JSON.stringify({
+          label: facet?.label ?? "",
+          type: facet?.type ?? "",
+          values: Array.isArray(facet?.values) ? facet.values : [],
+        });
+
+  return crypto.createHash("md5").update(idSource).digest("hex");
 }
 
 function buildEmbeddingText(facet: any): string {
@@ -182,7 +188,7 @@ async function main() {
 
     // 3️⃣ Existing IDs
     const existingIds = await getExistingIds();
-
+    console.log(`📦 existingIds: ${existingIds.size}\n`);
     // 4️⃣ Prepare points
     const points = [];
 
@@ -194,19 +200,23 @@ async function main() {
         continue;
       }
 
-      const text = buildEmbeddingText(facet);
+      if (Array.isArray(facet.values) && facet.values.length > 0) {
+        const text = buildEmbeddingText(facet);
 
-      const vector = await getEmbedding(text);
+        const vector = await getEmbedding(text);
 
-      if (!vector.length) continue;
+        if (!vector.length) continue;
 
-      points.push({
-        id,
-        vector,
-        payload: facet
-      });
+        points.push({
+          id,
+          vector,
+          payload: facet,
+        });
 
-      console.log(`✅ Prepared: ${facet.label}`);
+        console.log(`✅ Prepared: ${facet.label}`);
+      } else {
+        console.log(`⚠️ Skipping (no values): ${facet.label}`);
+      }
     }
 
     // 5️⃣ Insert

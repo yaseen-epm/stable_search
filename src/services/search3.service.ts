@@ -1,6 +1,7 @@
 import { FacetVectorService } from "./facetvector.service";
 import { LLMService } from "./llm3.service";
 import { cache } from "../utils/tieredCache";
+import { ENV } from "../config/env";
 
 type FacetMap = Record<string, { value: string; score: number }[]>;
 
@@ -14,15 +15,18 @@ export class SearchService3 {
     const parsedFilters = this.parseFilters(providedFilters);
     const filtersKey = this.filtersCacheKey(parsedFilters);
     const cacheKey = `search3:v1:${normalizedQuery.toLowerCase()}:${filtersKey}`;
-
     try {
-      const tCache = Date.now();
-      const cached = await cache.get<any>(cacheKey);
-      const cacheMs = Date.now() - tCache;
-      if (cached) return cached;
-      console.log(
-        `[perf] op=search cache=miss status=ok ms=${cacheMs} key_len=${cacheKey.length} query_len=${normalizedQuery.length} filters=${Object.keys(parsedFilters).length}`
-      );
+      if (ENV.CACHE_ENABLED) {
+        const tCache = Date.now();
+        const cached = await cache.get<any>(cacheKey);
+        const cacheMs = Date.now() - tCache;
+        if (cached) return cached;
+        console.log(
+          `[perf] op=search cache=miss status=ok ms=${cacheMs} key_len=${cacheKey.length} query_len=${normalizedQuery.length} filters=${Object.keys(parsedFilters).length}`,
+        );
+      } else {
+        console.log("cache disabled, skipping cache retrieval");
+      }
     } catch {
       // best-effort cache
     }
@@ -31,11 +35,11 @@ export class SearchService3 {
 
     const tFacets = Date.now();
     const facetResults = await Promise.all(
-      queries.map(q => this.facetService.getRelevantFacets(q))
+      queries.map((q) => this.facetService.getRelevantFacets(q)),
     );
     const facetsMs = Date.now() - tFacets;
     console.log(
-      `[perf] op=facet_candidates source=qdrant status=ok ms=${facetsMs} subqueries=${queries.length} query_len=${normalizedQuery.length}`
+      `[perf] op=facet_candidates source=qdrant status=ok ms=${facetsMs} subqueries=${queries.length} query_len=${normalizedQuery.length}`,
     );
 
     let mergedFacets: FacetMap = {};
@@ -49,11 +53,11 @@ export class SearchService3 {
     if (Object.keys(finalFacets).length === 0) {
       const structured = {
         query: normalizedQuery,
-        mapping: this.mergeProvidedFilters({}, parsedFilters, {})
+        mapping: this.mergeProvidedFilters({}, parsedFilters, {}),
       };
       const response = {
         structured,
-        ajaxQuery: this.buildAjax(structured)
+        ajaxQuery: this.buildAjax(structured),
       };
 
       try {
@@ -66,20 +70,32 @@ export class SearchService3 {
     }
 
     const tLlm = Date.now();
-    const structuredRaw = await this.llmService.generate(normalizedQuery, finalFacets, parsedFilters);
+    const structuredRaw = await this.llmService.generate(
+      normalizedQuery,
+      finalFacets,
+      parsedFilters,
+    );
     const llmMs = Date.now() - tLlm;
     console.log(
-      `[perf] op=llm_total status=ok ms=${llmMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+      `[perf] op=llm_total status=ok ms=${llmMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`,
     );
-    const structuredBase = this.sanitizeStructured(structuredRaw, finalFacets, normalizedQuery);
+    const structuredBase = this.sanitizeStructured(
+      structuredRaw,
+      finalFacets,
+      normalizedQuery,
+    );
     const structured = {
       query: structuredBase.query,
-      mapping: this.mergeProvidedFilters(structuredBase.mapping, parsedFilters, finalFacets)
+      mapping: this.mergeProvidedFilters(
+        structuredBase.mapping,
+        parsedFilters,
+        finalFacets,
+      ),
     };
 
     const response = {
       structured,
-      ajaxQuery: this.buildAjax(structured)
+      ajaxQuery: this.buildAjax(structured),
     };
 
     try {
@@ -90,7 +106,7 @@ export class SearchService3 {
 
     const totalMs = Date.now() - tAll;
     console.log(
-      `[perf] op=search_response status=ok total_ms=${totalMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`
+      `[perf] op=search_response status=ok total_ms=${totalMs} query_len=${normalizedQuery.length} facets=${Object.keys(finalFacets).length} provided_filters=${Object.keys(parsedFilters).length}`,
     );
     return response;
   }
@@ -100,7 +116,7 @@ export class SearchService3 {
     if (keys.length === 0) return "nofilters";
 
     return keys
-      .map(k => `${k}=${(filters[k] || []).slice().sort().join("|")}`)
+      .map((k) => `${k}=${(filters[k] || []).slice().sort().join("|")}`)
       .join("&");
   }
 
@@ -110,7 +126,10 @@ export class SearchService3 {
     let v = raw.trim();
     if (v.length === 0) return null;
 
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
       v = v.slice(1, -1).trim();
     }
 
@@ -128,7 +147,9 @@ export class SearchService3 {
     if (!input || typeof input !== "object") return {};
 
     const out: Record<string, string[]> = {};
-    for (const [facetIdRaw, rawVal] of Object.entries(input as Record<string, unknown>)) {
+    for (const [facetIdRaw, rawVal] of Object.entries(
+      input as Record<string, unknown>,
+    )) {
       const facetId = String(facetIdRaw).trim();
       if (!facetId) continue;
 
@@ -140,7 +161,7 @@ export class SearchService3 {
           if (n) values.push(n);
         }
       } else if (typeof rawVal === "string") {
-        rawVal.split("|").forEach(part => {
+        rawVal.split("|").forEach((part) => {
           const n = this.normalizeFilterValue(part);
           if (n) values.push(n);
         });
@@ -160,7 +181,7 @@ export class SearchService3 {
   private mergeProvidedFilters(
     mapping: Record<string, string[]>,
     provided: Record<string, string[]>,
-    allowedFacets: Record<string, string[]>
+    allowedFacets: Record<string, string[]>,
   ) {
     if (!provided || Object.keys(provided).length === 0) return mapping;
 
@@ -177,13 +198,17 @@ export class SearchService3 {
 
       const cleaned = allowed
         ? list
-            .map(v => String(v).trim())
-            .filter(v => v.length > 0)
-            .filter(v => new Set(allowed.map(a => String(a).toLowerCase())).has(v.toLowerCase()))
+            .map((v) => String(v).trim())
+            .filter((v) => v.length > 0)
+            .filter((v) =>
+              new Set(allowed.map((a) => String(a).toLowerCase())).has(
+                v.toLowerCase(),
+              ),
+            )
             .slice(0, 20)
         : list
-            .map(v => String(v).trim())
-            .filter(v => v.length > 0)
+            .map((v) => String(v).trim())
+            .filter((v) => v.length > 0)
             .slice(0, 20);
 
       if (cleaned.length) out[facetId] = cleaned;
@@ -195,10 +220,11 @@ export class SearchService3 {
   private sanitizeStructured(
     data: any,
     allowedFacets: Record<string, string[]>,
-    fallbackQuery: string
+    fallbackQuery: string,
   ) {
     const query = typeof data?.query === "string" ? data.query : fallbackQuery;
-    const mappingIn = data?.mapping && typeof data.mapping === "object" ? data.mapping : {};
+    const mappingIn =
+      data?.mapping && typeof data.mapping === "object" ? data.mapping : {};
 
     const mappingOut: Record<string, string[]> = {};
     const allowedFacetIds = new Set(Object.keys(allowedFacets));
@@ -206,13 +232,15 @@ export class SearchService3 {
     for (const [facetId, values] of Object.entries(mappingIn)) {
       if (!allowedFacetIds.has(facetId)) continue;
 
-      const allowedValues = new Set((allowedFacets[facetId] || []).map(v => String(v).toLowerCase()));
+      const allowedValues = new Set(
+        (allowedFacets[facetId] || []).map((v) => String(v).toLowerCase()),
+      );
       const list = Array.isArray(values) ? values : [values];
       const cleaned = list
-        .map(v => String(v))
-        .map(v => v.trim())
-        .filter(v => v.length > 0)
-        .filter(v => allowedValues.has(v.toLowerCase()))
+        .map((v) => String(v))
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0)
+        .filter((v) => allowedValues.has(v.toLowerCase()))
         .slice(0, 5);
 
       if (cleaned.length) mappingOut[facetId] = cleaned;
@@ -245,7 +273,7 @@ export class SearchService3 {
       price: /cheap|under|budget|low price/.test(q),
       rating: /best|top|quality|rating/.test(q),
       premium: /premium|luxury|high end/.test(q),
-      brand: /nike|bosch|adidas|puma/.test(q)
+      brand: /nike|bosch|adidas|puma/.test(q),
     };
   }
 
@@ -258,13 +286,13 @@ export class SearchService3 {
   private merge(
     base: FacetMap,
     incoming: Record<string, string[]>,
-    weight: number
+    weight: number,
   ): FacetMap {
     for (const facet in incoming) {
       if (!base[facet]) base[facet] = [];
 
       for (const value of incoming[facet]) {
-        const existing = base[facet].find(v => v.value === value);
+        const existing = base[facet].find((v) => v.value === value);
 
         if (existing) {
           existing.score += weight;
@@ -284,7 +312,7 @@ export class SearchService3 {
       result[facet] = facets[facet]
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
-        .map(v => v.value);
+        .map((v) => v.value);
     }
 
     return result;

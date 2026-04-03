@@ -12,7 +12,7 @@ const client = new AzureOpenAI({
 const cache = new Map<string, number[]>();
 
 const EMBEDDING_DEPLOYMENT = ENV.AZURE_EMBEDDING_DEPLOYMENT;
-const TIMEOUT_MS = 2500;
+const TIMEOUT_MS = 25000;
 
 export async function getEmbedding(text: string): Promise<number[]> {
   const key = text.toLowerCase().trim();
@@ -77,13 +77,13 @@ export class EmbeddingService {
 
       const ms = Date.now() - t0;
       console.log(
-        `[perf] embedding source=remote status=ok model=${ENV.AZURE_EMBEDDING_DEPLOYMENT} ms=${ms} timeout_ms=${TIMEOUT_MS} input_len=${String(text).length}`
+        `[perf] embedding 1 source=remote status=ok model=${ENV.AZURE_EMBEDDING_DEPLOYMENT} ms=${ms} timeout_ms=${TIMEOUT_MS} input_len=${String(text).length}`
       );
       return res.data[0].embedding;
     } catch (err: any) {
       const message = err?.message || String(err);
       console.log(
-        `[perf] embedding source=remote status=error model=${ENV.AZURE_EMBEDDING_DEPLOYMENT} timeout_ms=${TIMEOUT_MS} error=${message}`
+        `[perf] embedding 1 source=remote status=error model=${ENV.AZURE_EMBEDDING_DEPLOYMENT} timeout_ms=${TIMEOUT_MS} error=${message}`
       );
       return [];
     }

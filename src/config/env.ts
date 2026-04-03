@@ -12,5 +12,6 @@ export const ENV = {
   QDRANT_COLLECTION: process.env.QDRANT_COLLECTION || 'facet_groups',
   REDIS_URL: process.env.REDIS_URL,
   CACHE_TTL_SECONDS: Number(process.env.CACHE_TTL_SECONDS || 300),
-  CACHE_MEMORY_MAX_ITEMS: Number(process.env.CACHE_MEMORY_MAX_ITEMS || 1000)
+  CACHE_MEMORY_MAX_ITEMS: Number(process.env.CACHE_MEMORY_MAX_ITEMS || 1000),
+  CACHE_ENABLED : process.env.CACHE_ENABLED === 'true',
 };

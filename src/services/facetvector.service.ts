@@ -7,16 +7,16 @@ export class FacetVectorService {
   private client = new QdrantClient({ url: ENV.QDRANT_URL });
   private embeddingService = new EmbeddingService();
 
-  private static readonly EMBED_TIMEOUT_MS = 2500;
-  private static readonly QDRANT_TIMEOUT_MS = 2000;
+  private static readonly EMBED_TIMEOUT_MS = 25000;
+  private static readonly QDRANT_TIMEOUT_MS = 20000;
 
-  private extractQ1(url: unknown): string | null {
+  private extractUrlParam(url: unknown, param: string): string | null {
     if (typeof url !== "string" || url.trim().length === 0) return null;
 
     try {
       const u = new URL(url, "http://local");
-      const q1 = u.searchParams.get("q1");
-      return (typeof q1 === "string" && q1.trim().length > 0) ? q1.trim() : null;
+      const value = u.searchParams.get(param);
+      return (typeof value === "string" && value.trim().length > 0) ? value.trim() : null;
     } catch {
       return null;
     }
@@ -73,25 +73,18 @@ export class FacetVectorService {
       const p = r.payload;
       if (!p?.id || !Array.isArray(p.values)) continue;
 
-      const facetId = p.id;
-      const facetType = p.type;
-      const isRangeFacet = facetType === "range" || facetId === "pricerange";
-
-      if (!grouped[facetId]) grouped[facetId] = [];
-
       // 🔥 extract values from facet group
       for (const v of p.values) {
-        const fromUrl = isRangeFacet ? this.extractQ1(v?.url) : null;
-        const fromLabel = (typeof v?.label === "string" && v.label.trim().length > 0)
-          ? v.label.trim()
-          : null;
+         // p.url looks like - "url": "?store=600&x1=ast-id-level-2&q1=DC0002124"
+         // We want to extract the value of the "q1" parameter from the URL and key (currently facetid) from x1 parameter always
+        const groupedKey = this.extractUrlParam(v?.url, "x1");
+        const groupedValue = this.extractUrlParam(v?.url, "q1");
+        if (!groupedKey || !groupedValue) continue;
 
-        const chosen = fromUrl || fromLabel;
-        if (!chosen) continue;
-
-        grouped[facetId].push(chosen);
+        if (!grouped[groupedKey]) grouped[groupedKey] = [];
+        grouped[groupedKey].push(groupedValue);
       }
-    }
+    } 
 
     // ✅ dedupe + limit
     Object.keys(grouped).forEach(facet => {
