@@ -10,6 +10,11 @@ export class LLMService {
   });
 
   private static readonly TIMEOUT_MS = 6000;
+  private static readonly EMPTY_RESULT = {
+    query: "",
+    filters: {},
+    mapping: {}
+  };
 
   async generate(userQuery: string, facets: any, providedFilters?: any) {
     const t0 = Date.now();
@@ -24,6 +29,14 @@ RULES:
 - Prefer HIGH relevance facets only
 - If user query conflicts with provided filters, user query wins
 - Provided filters are optional hints / preselected filters
+- In output "query", return ONLY the main item/product intent
+- Remove any words already represented in "mapping"
+- Exclude filter-like terms such as gender, brand, color, size, rating, price, material, discount, availability if they are mapped
+- Keep "query" short and noun-focused
+
+EXAMPLE:
+Input query: "shoes for mens with rating 5"
+If mapping resolves gender=mens and rating=5, then output query must be exactly "shoes"
 
 User Query:
 "${userQuery}"
@@ -36,7 +49,7 @@ ${JSON.stringify(facets)}
 
 Return JSON:
 {
-  "query": "...",
+  "query": "main item/product only",
   "mapping": {
     "<facet.id>": ["value"]
   }
@@ -60,17 +73,17 @@ Return JSON:
       );
 
       try {
-        return JSON.parse(raw);
+        return this.normalizeResult(JSON.parse(raw));
       } catch {
         const match = raw.match(/\{[\s\S]*\}/);
         if (match) {
           try {
-            return JSON.parse(match[0]);
+            return this.normalizeResult(JSON.parse(match[0]));
           } catch {
-            return { query: userQuery, filters: {}, mapping: {} };
+            return LLMService.EMPTY_RESULT;
           }
         }
-        return { query: userQuery, filters: {}, mapping: {} };
+        return LLMService.EMPTY_RESULT;
       }
     } catch (err: any) {
       const ms = Date.now() - t0;
@@ -79,7 +92,23 @@ Return JSON:
         `[perf] op=llm_generate status=error model=${ENV.AZURE_DEPLOYMENT} ms=${ms} timeout_ms=${LLMService.TIMEOUT_MS} query_len=${userQuery.length} facets=${Object.keys(facets || {}).length} provided_filters=${Object.keys(providedFilters || {}).length} error=${message}`
       );
       console.error("LLM generate error:", err?.message || err);
-      return { query: userQuery, filters: {}, mapping: {} };
+      return LLMService.EMPTY_RESULT;
     }
+  }
+
+  private normalizeResult(result: any) {
+    const query =
+      typeof result?.query === "string"
+        ? result.query.trim().replace(/\s+/g, " ")
+        : "";
+
+    return {
+      query,
+      filters: {},
+      mapping:
+        result?.mapping && typeof result.mapping === "object"
+          ? result.mapping
+          : {}
+    };
   }
 }
