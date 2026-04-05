@@ -12,6 +12,97 @@ The package can now be used in two modes:
 
 ## 🏗️ E-commerce AI Search Architecture
 
+## 🏗️ E-commerce AI Search Architecture
+
+```mermaid
+flowchart LR
+
+%% Frontend
+A[Frontend UI] -->|Search Query| B[Backend API]
+
+%% Backend calls Library
+B -->|Call AI Search Library| C[Search Orchestrator]
+
+%% LLM Layer
+C --> D[LLM Query Understanding]
+D --> E[Sanitize and Allowlist]
+E --> C
+
+%% Cache Layer
+C --> F[Cache L1 Memory]
+C --> G[Cache L2 Redis]
+
+%% Semantic Search
+C --> H[Embedding Generator]
+H --> I[Vector DB Qdrant]
+I --> J[Candidate Retrieval]
+J --> C
+
+%% Final Query to Search API (SAPI)
+C --> K[Final Query Builder]
+K --> L[Search API SAPI]
+
+%% Response back to Backend
+L --> M[Search Results]
+M --> B
+
+%% Backend to Frontend
+B -->|Final Response| A
+
+
+---
+
+# 🔍 Clear System Separation (Important for your README)
+
+## 🧑‍💻 Frontend (FE)
+- Sends user search query
+- Displays results
+
+---
+
+## ⚙️ Backend API
+- Entry point (`/search`)
+- Calls AI Search Library
+- Calls Search API (SAPI)
+- Returns final response to FE
+
+---
+
+## 🧠 AI Search Library (Your Core System)
+- Query understanding (LLM)
+- Sanitization & validation
+- Cache handling
+- Embeddings + vector search (Qdrant)
+- Builds **final structured query**
+
+---
+
+## 🔎 Search API (SAPI)
+- Executes final query
+- Fetches actual product results
+- Returns results to backend
+
+---
+
+# 🔄 Final Flow (Updated Correctly)
+
+```text
+1. FE → Backend API
+2. Backend → AI Search Library
+3. Library:
+   - LLM parses query
+   - Cache check
+   - Vector search
+   - Builds final query
+4. Final Query → Search API (SAPI)
+5. SAPI → returns product results
+6. Backend → sends response to FE
+
+
+
+
+
+
 ```mermaid
 flowchart LR
 
