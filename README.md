@@ -9,70 +9,38 @@ The package can now be used in two modes:
 - Library mode: install `llm-search-lib` and call `search(query)` directly.
 - Server mode: run the Express endpoint (`POST /search`) as before.
 
-## System Architecture
 
+## 🏗️ E-commerce AI Search Architecture
+
+```mermaid
 flowchart LR
 
-    %% FRONTEND
-    subgraph Frontend (Client)
-        A[🛒 E-commerce UI]
-    end
+    %% Frontend
+    A[Frontend UI] -->|Search Query| B[Backend API /search]
 
-    %% BACKEND API
-    subgraph E-commerce Backend
-        B[Search API Endpoint\n(/search)]
-    end
+    %% Backend to Library
+    B -->|Call AI Search Library| C[Search Orchestrator]
 
-    %% AI SEARCH LIBRARY
-    subgraph AI Search Library (Reusable Module)
+    %% LLM Layer
+    C --> D[LLM Query Understanding]
+    D --> E[Sanitize & Allowlist]
+    E --> C
 
-        C[Search Orchestrator]
+    %% Cache Layer
+    C --> F[In-Memory Cache L1]
+    C --> G[Redis Cache L2]
 
-        %% LLM
-        subgraph LLM Layer
-            D[LLM (Query Understanding)]
-            E[Sanitize + Allowlist]
-        end
+    %% Semantic Search
+    C --> H[Embedding Generator]
+    H --> I[Vector DB Qdrant]
+    I --> J[Candidate Retrieval]
+    J --> C
 
-        %% CACHE
-        subgraph Cache Layer
-            F[(L1 Cache - Memory)]
-            G[(L2 Cache - Redis)]
-        end
+    %% Response Flow
+    C --> K[Structured Query Response]
+    K --> B
+    B -->|Final Response| A
 
-        %% SEMANTIC SEARCH
-        subgraph Semantic Search
-            H[Embeddings Generator]
-            I[(Vector DB - Qdrant)]
-            J[Facet / Candidate Builder]
-        end
-
-    end
-
-    %% RESPONSE
-    subgraph Response Layer
-        K[Structured Query Response]
-    end
-
-    %% FLOW
-
-    %% FE → Backend
-    A -->|Search Query| B
-
-    %% Backend → Library
-    B -->|Call Library| C
-
-    %% Inside Library
-    C --> D --> E --> C
-    C --> F
-    C --> G
-    C --> H --> I --> J --> C
-
-    %% Library → Backend
-    C -->|Processed Query| K
-
-    %% Backend → FE
-    K --> B -->|Final Response| A
 
 ## Architecture (block diagram)
 
