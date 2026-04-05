@@ -34,6 +34,7 @@ J --> C
 C --> K[Structured Query Response]
 K --> B
 B -->|Final Response| A
+```
 
 
 ## Architecture (block diagram)
