@@ -15,31 +15,25 @@ The package can now be used in two modes:
 ```mermaid
 flowchart LR
 
-    %% Frontend
-    A[Frontend UI] -->|Search Query| B[Backend API /search]
+A[Frontend UI] -->|Search Query| B[Backend API /search]
 
-    %% Backend to Library
-    B -->|Call AI Search Library| C[Search Orchestrator]
+B -->|Call AI Search Library| C[Search Orchestrator]
 
-    %% LLM Layer
-    C --> D[LLM Query Understanding]
-    D --> E[Sanitize & Allowlist]
-    E --> C
+C --> D[LLM Query Understanding]
+D --> E[Sanitize & Allowlist]
+E --> C
 
-    %% Cache Layer
-    C --> F[In-Memory Cache L1]
-    C --> G[Redis Cache L2]
+C --> F[In-Memory Cache L1]
+C --> G[Redis Cache L2]
 
-    %% Semantic Search
-    C --> H[Embedding Generator]
-    H --> I[Vector DB Qdrant]
-    I --> J[Candidate Retrieval]
-    J --> C
+C --> H[Embedding Generator]
+H --> I[Vector DB Qdrant]
+I --> J[Candidate Retrieval]
+J --> C
 
-    %% Response Flow
-    C --> K[Structured Query Response]
-    K --> B
-    B -->|Final Response| A
+C --> K[Structured Query Response]
+K --> B
+B -->|Final Response| A
 
 
 ## Architecture (block diagram)
