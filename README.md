@@ -9,6 +9,71 @@ The package can now be used in two modes:
 - Library mode: install `llm-search-lib` and call `search(query)` directly.
 - Server mode: run the Express endpoint (`POST /search`) as before.
 
+## System Architecture
+
+flowchart LR
+
+    %% FRONTEND
+    subgraph Frontend (Client)
+        A[🛒 E-commerce UI]
+    end
+
+    %% BACKEND API
+    subgraph E-commerce Backend
+        B[Search API Endpoint\n(/search)]
+    end
+
+    %% AI SEARCH LIBRARY
+    subgraph AI Search Library (Reusable Module)
+
+        C[Search Orchestrator]
+
+        %% LLM
+        subgraph LLM Layer
+            D[LLM (Query Understanding)]
+            E[Sanitize + Allowlist]
+        end
+
+        %% CACHE
+        subgraph Cache Layer
+            F[(L1 Cache - Memory)]
+            G[(L2 Cache - Redis)]
+        end
+
+        %% SEMANTIC SEARCH
+        subgraph Semantic Search
+            H[Embeddings Generator]
+            I[(Vector DB - Qdrant)]
+            J[Facet / Candidate Builder]
+        end
+
+    end
+
+    %% RESPONSE
+    subgraph Response Layer
+        K[Structured Query Response]
+    end
+
+    %% FLOW
+
+    %% FE → Backend
+    A -->|Search Query| B
+
+    %% Backend → Library
+    B -->|Call Library| C
+
+    %% Inside Library
+    C --> D --> E --> C
+    C --> F
+    C --> G
+    C --> H --> I --> J --> C
+
+    %% Library → Backend
+    C -->|Processed Query| K
+
+    %% Backend → FE
+    K --> B -->|Final Response| A
+
 ## Architecture (block diagram)
 
 ```mermaid
