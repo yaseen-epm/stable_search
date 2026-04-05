@@ -13,39 +13,40 @@ The package can now be used in two modes:
 ## 🏗️ E-commerce AI Search Architecture
 
 
+## 🏗️ E-commerce AI Search Architecture
+
 ```mermaid
 flowchart LR
 
 %% Frontend
-A[Frontend UI] -->|Search Query| B[Backend API]
+A[Frontend UI] -->|Search Query| B[CDS Service Backend]
 
 %% Backend calls Library
 B -->|Call AI Search Library| C[Search Orchestrator]
 
-%% LLM Layer
+%% Library Internal Flow
 C --> D[LLM Query Understanding]
 D --> E[Sanitize and Allowlist]
 E --> C
 
-%% Cache Layer
 C --> F[Cache L1 Memory]
 C --> G[Cache L2 Redis]
 
-%% Semantic Search
 C --> H[Embedding Generator]
 H --> I[Vector DB Qdrant]
 I --> J[Candidate Retrieval]
 J --> C
 
-%% Final Query to Search API (SAPI)
-C --> K[Final Query Builder]
-K --> L[Search API SAPI]
+%% Library returns FINAL QUERY to CDS
+C -->|Final Query| B
 
-%% Response back to Backend
-L --> M[Search Results]
-M --> B
+%% CDS calls SAPI
+B -->|Call SAPI| K[Search API SAPI]
 
-%% Backend to Frontend
+%% SAPI returns results to CDS
+K -->|Search Results| B
+
+%% CDS returns response to FE
 B -->|Final Response| A
 ```
 
