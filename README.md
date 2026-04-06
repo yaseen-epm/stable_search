@@ -9,6 +9,46 @@ The package can now be used in two modes:
 - Library mode: install `llm-search-lib` and call `search(query)` directly.
 - Server mode: run the Express endpoint (`POST /search`) as before.
 
+
+## 🏗️ E-commerce AI Search Architecture
+
+
+```mermaid
+flowchart LR
+
+%% Frontend
+A[Frontend UI] -->|Search Query| B[CDS Service Backend]
+
+%% Backend calls Library
+B -->|Call AI Search Library| C[Search Orchestrator]
+
+%% Library Internal Flow
+C --> D[LLM Query Understanding]
+D --> E[Sanitize and Allowlist]
+E --> C
+
+C --> F[Cache L1 Memory]
+C --> G[Cache L2 Redis]
+
+C --> H[Embedding Generator]
+H --> I[Vector DB Qdrant]
+I --> J[Candidate Retrieval]
+J --> C
+
+%% Library returns FINAL QUERY to CDS
+C -->|Final Query| B
+
+%% CDS calls SAPI
+B -->|Call SAPI| K[Search API SAPI]
+
+%% SAPI returns results to CDS
+K -->|Search Results| B
+
+%% CDS returns response to FE
+B -->|Final Response| A
+```
+
+
 ## Architecture (block diagram)
 
 ```mermaid
