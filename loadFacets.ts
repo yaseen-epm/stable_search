@@ -12,7 +12,7 @@ import { ENV } from "./src/config/env";
  */
 
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
-const COLLECTION_NAME = "facet_groups";
+const COLLECTION_NAME = "demo_facets";
 
 // Azure OpenAI
 const AZURE_OPENAI_KEY = process.env.AZURE_OPENAI_KEY!;
@@ -104,22 +104,40 @@ async function createCollection() {
   console.log("✅ Collection created");
 }
 
-// Get existing IDs
-async function getExistingIds(): Promise<Set<string>> {
-  try {
-    const res = await axios.post(
-      `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
-      {
-        limit: 1000,
-        with_payload: false,
-        with_vector: false,
-      },
-    );
+// Get existing facet signatures keyed by ID
+async function getExistingFacetSignatures(): Promise<Map<string, string>> {
+  const facetSignatures = new Map<string, string>();
 
-    return new Set(res.data.result.points.map((p: any) => p.id));
+  try {
+    let offset: string | number | null = null;
+
+    do {
+      const res:any = await axios.post(
+        `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
+        {
+          limit: 1000,
+          offset,
+          with_payload: true,
+          with_vector: false,
+        },
+      );
+
+      const points = res.data.result.points ?? [];
+
+      for (const point of points) {
+        const id = String(point.id);
+        const payload = point.payload ?? {};
+
+        facetSignatures.set(id, normalizeFacetForComparison(payload));
+      }
+
+      offset = res.data.result.next_page_offset ?? null;
+    } while (offset !== null);
+
+    return facetSignatures;
   } catch (err: any) {
     console.warn("⚠️ No existing data or scroll failed");
-    return new Set();
+    return new Map();
   }
 }
 
@@ -161,6 +179,15 @@ Values: ${values}
   `;
 }
 
+function normalizeFacetForComparison(facet: any): string {
+  return JSON.stringify({
+    id: facet?.id ?? null,
+    label: facet?.label ?? null,
+    type: facet?.type ?? null,
+    values: Array.isArray(facet?.values) ? facet.values : [],
+  });
+}
+
 /**
  * ============================
  * 🚀 MAIN SCRIPT
@@ -186,17 +213,25 @@ async function main() {
 
     console.log(`📦 Loaded ${facets.length} facet groups\n`);
 
-    // 3️⃣ Existing IDs
-    const existingIds = await getExistingIds();
-    console.log(`📦 existingIds: ${existingIds.size}\n`);
+    // 3️⃣ Existing facet signatures
+    const existingFacetSignatures = await getExistingFacetSignatures();
+    console.log(`📦 existingIds: ${existingFacetSignatures.size}\n`);
     // 4️⃣ Prepare points
     const points = [];
+    let newCount = 0;
+    let updatedCount = 0;
+    let unchangedCount = 0;
+    let noValuesCount = 0;
+    let embeddingFailedCount = 0;
 
     for (const facet of facets) {
       const id = generateId(facet);
+      const currentSignature = normalizeFacetForComparison(facet);
+      const existingSignature = existingFacetSignatures.get(id);
 
-      if (existingIds.has(id)) {
-        console.log(`⏭ Skipping: ${facet.label}`);
+      if (existingSignature === currentSignature) {
+        console.log(`⏭ Skipping (unchanged): ${facet.label}`);
+          unchangedCount += 1;
         continue;
       }
 
@@ -205,7 +240,10 @@ async function main() {
 
         const vector = await getEmbedding(text);
 
-        if (!vector.length) continue;
+          if (!vector.length) {
+            embeddingFailedCount += 1;
+            continue;
+          }
 
         points.push({
           id,
@@ -213,11 +251,25 @@ async function main() {
           payload: facet,
         });
 
-        console.log(`✅ Prepared: ${facet.label}`);
+        if (existingSignature) {
+          console.log(`♻️ Prepared update: ${facet.label}`);
+            updatedCount += 1;
+        } else {
+          console.log(`✅ Prepared new: ${facet.label}`);
+            newCount += 1;
+        }
       } else {
         console.log(`⚠️ Skipping (no values): ${facet.label}`);
+          noValuesCount += 1;
       }
     }
+
+    console.log("\n📊 Summary");
+    console.log(`- New: ${newCount}`);
+    console.log(`- Updated: ${updatedCount}`);
+    console.log(`- Unchanged skipped: ${unchangedCount}`);
+    console.log(`- No values skipped: ${noValuesCount}`);
+    console.log(`- Embedding failed skipped: ${embeddingFailedCount}`);
 
     // 5️⃣ Insert
     if (points.length === 0) {

@@ -61,7 +61,7 @@ Return JSON:
         this.client.chat.completions.create({
           model: ENV.AZURE_DEPLOYMENT,
           messages: [{ role: "user", content: prompt }],
-          temperature: 0
+          temperature: 0.3
         }),
         LLMService.TIMEOUT_MS
       );

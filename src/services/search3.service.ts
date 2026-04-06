@@ -311,7 +311,7 @@ export class SearchService3 {
     for (const facet in facets) {
       result[facet] = facets[facet]
         .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
+        .slice(0, 25)
         .map((v) => v.value);
     }
 

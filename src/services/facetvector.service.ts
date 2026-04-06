@@ -88,7 +88,7 @@ export class FacetVectorService {
 
     // ✅ dedupe + limit
     Object.keys(grouped).forEach(facet => {
-      grouped[facet] = [...new Set(grouped[facet])].slice(0, 5);
+      grouped[facet] = [...new Set(grouped[facet])].slice(0, 25);
     });
 
     return grouped;
